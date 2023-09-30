@@ -67,16 +67,18 @@ def process_export(blob, prefix):
 
 
 def main(argv):
-    if len(argv) == 0:
+    argv = [a for a in argv if os.path.exists(a)]
+    while len(argv) == 0:
         print("To use this tool, you need a PluralKit export file, from the pk;export command.")
         print("Please drag-and-drop your PluralKit export file onto this window, and then press Enter.")
         argv = [input(">>> ")]
+        argv = [a for a in argv if os.path.exists(a)]
 
     for n in argv:
         if not os.path.exists(n):
             continue
         try:
-            with open(n, 'r') as fh:
+            with open(n, 'rb') as fh:
                 blob = json.load(fh)
                 if "version" not in blob and "switches" not in blob:
                     raise RuntimeError("unknown file type")
@@ -85,11 +87,16 @@ def main(argv):
                 os.makedirs(prefix, exist_ok=True)
                 process_export(blob, prefix)
 
+        except KeyboardInterrupt:
+            break
+
         except Exception as ex:
             print("Error processing file %r:" % n)
             print(str(ex))
             print('')
 
+    print("Script finished - press Enter to exit")
+    input('')
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
