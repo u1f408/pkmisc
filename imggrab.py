@@ -22,6 +22,12 @@ from urllib.error import URLError
 USER_AGENT = "pk-imggrab/0.1 (https://github.com/u1f408/pkmisc)"
 
 
+def pathfix(path):
+    if (path.startswith("'") and path.startswith("'")) or (path.startswith('"') and path.startswith('"')):
+        path = path[1:-1]
+    return path
+
+
 def sanitize_name(name):
     return re.sub(r'\W|[!\#\$%\&\'\*\+\-\.\^_`\|\~:]', '', name)
 
@@ -67,12 +73,12 @@ def process_export(blob, prefix):
 
 
 def main(argv):
-    argv = [a for a in argv if os.path.exists(a)]
+    argv = [pathfix(a) for a in argv if os.path.exists(pathfix(a))]
     while len(argv) == 0:
         print("To use this tool, you need a PluralKit export file, from the pk;export command.")
         print("Please drag-and-drop your PluralKit export file onto this window, and then press Enter.")
         argv = [input(">>> ")]
-        argv = [a for a in argv if os.path.exists(a)]
+        argv = [pathfix(a) for a in argv if os.path.exists(pathfix(a))]
 
     for n in argv:
         if not os.path.exists(n):
@@ -97,6 +103,7 @@ def main(argv):
 
     print("Script finished - press Enter to exit")
     input('')
+
 
 if __name__ == "__main__":
     sys.exit(main(sys.argv[1:]))
