@@ -14,12 +14,12 @@ import sys
 
 import re
 import json
-import urllib.request
+import mimetypes
+from urllib.request import Request, urlopen
 from urllib.error import URLError
-from urllib.parse import urlparse
 
 
-USER_AGENT = "pk-avigrab/0.1 (https://github.com/u1f408/pkmisc)"
+USER_AGENT = "pk-imggrab/0.1 (https://github.com/u1f408/pkmisc)"
 
 
 def sanitize_name(name):
@@ -30,14 +30,14 @@ def maybe_grab(url, basefn, prefix):
     if url is None or url == "":
         return
 
-    parseres = urlparse(url)
-    outfn = os.path.join(prefix, basefn) + os.path.splitext(parseres.path)[1]
-
     try:
-        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        with urllib.request.urlopen(req) as resp:
+        req = Request(url, headers={"User-Agent": USER_AGENT})
+        with urlopen(req) as resp:
             if resp.status != 200:
                 return
+
+            outext = mimetypes.guess_extension(resp.headers["Content-Type"].split(';')[0])
+            outfn = os.path.join(prefix, basefn) + outext
 
             print(f"saving {outfn}")
             with open(outfn, 'wb') as fd:
