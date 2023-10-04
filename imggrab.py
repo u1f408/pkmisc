@@ -17,6 +17,7 @@ import json
 import mimetypes
 from urllib.request import Request, urlopen
 from urllib.error import URLError
+from pathlib import Path
 
 
 USER_AGENT = "pk-imggrab/0.1 (https://github.com/u1f408/pkmisc)"
@@ -43,10 +44,10 @@ def maybe_grab(url, basefn, prefix):
                 return
 
             outext = mimetypes.guess_extension(resp.headers["Content-Type"].split(';')[0])
-            outfn = os.path.join(prefix, basefn) + outext
+            outfn = Path(prefix) / (basefn + outext)
 
-            print(f"saving {outfn}")
-            with open(outfn, 'wb') as fd:
+            print(f"saving {outfn.name}")
+            with open(str(outfn), 'wb') as fd:
                 while True:
                     chunk = resp.read(128)
                     if chunk == b'':
@@ -59,6 +60,8 @@ def maybe_grab(url, basefn, prefix):
 
 
 def process_export(blob, prefix):
+    print(f"Processing export for system {blob['id']} - saving to: {prefix!s}")
+
     maybe_grab(blob["avatar_url"], "system avatar", prefix)
     maybe_grab(blob["banner"], "system banner", prefix)
 
@@ -70,6 +73,9 @@ def process_export(blob, prefix):
     for group in blob["groups"]:
         maybe_grab(group["icon"], "group " + sanitize_name(group["name"]) + " icon", prefix)
         maybe_grab(group["banner"], "group " + sanitize_name(group["name"]) + " banner", prefix)
+
+    print(f"Finished for system {blob['id']}")
+    print('')
 
 
 def main(argv):
@@ -89,15 +95,37 @@ def main(argv):
                 if "version" not in blob and "switches" not in blob:
                     raise RuntimeError("unknown file type")
 
-                prefix = os.path.join('.', blob["id"])
-                os.makedirs(prefix, exist_ok=True)
-                process_export(blob, prefix)
+                attempt_prefix = [
+                    Path.cwd(),
+                    Path.home() / "pk-imggrab",
+                ]
+
+                realprefix = None
+                for prefix in attempt_prefix:
+                    prefix = prefix / blob["id"]
+                    try:
+                        prefix.mkdir(exist_ok=True)
+                        realprefix = prefix
+                        break
+                    except Exception as ex:
+                        print(f"!! couldn't mkdir {prefix!s}, trying next ({ex!s})")
+                        continue
+
+                while realprefix is None:
+                    print("!! Couldn't find a place to save the images to.")
+                    print("Please create a new folder somewhere to save the images to, then drag-and-drop that")
+                    print("folder onto this window and press Enter.")
+                    tmp = pathfix(input(">>> ") or '')
+                    if os.path.exists(tmp):
+                        realprefix = Path(tmp)
+
+                process_export(blob, realprefix)
 
         except KeyboardInterrupt:
             break
 
         except Exception as ex:
-            print("Error processing file %r:" % n)
+            print(f"!! Error processing file {n!r}: ")
             print(str(ex))
             print('')
 
