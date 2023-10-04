@@ -96,6 +96,7 @@ def main(argv):
                     raise RuntimeError("unknown file type")
 
                 attempt_prefix = [
+                    Path(n).parent,
                     Path.cwd(),
                     Path.home() / "pk-imggrab",
                 ]
