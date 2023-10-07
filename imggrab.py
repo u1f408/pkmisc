@@ -4,8 +4,14 @@
 """\
 imggrab.py - mass avatar/banner grabber from PluralKit export files
 
-see https://github.com/u1f408/pkmisc for details.
-licensed under CC0 / public domain.
+see https://github.com/u1f408/pkmisc for details, and documentation on
+how to use the script (if you're unsure, read the documentation!)
+
+if you need support using this script, please join the PluralKit Discord
+server (https://discord.gg/PczBt78) and ask in the #third-party-discussion
+channel. please don't open github issues for support queries.
+
+licensed under CC0 / public domain - no warranties given or implied.
 """
 
 import os
