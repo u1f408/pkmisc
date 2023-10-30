@@ -2,6 +2,15 @@
 
 Oh boy, I didn't expect people to **use** this stuff!
 
+## ScriptablePKFronters.js
+
+An opinionated PluralKit fronter display widget, for [Scriptable][] on
+iOS. Options are set in the `userOptions` object at the top of the script.
+
+![ScriptablePKFronters screenshot](./docs/assets/scriptablepkfronters.jpg)
+
+[Scriptable]: https://scriptable.app/
+
 ## imggrab.py
 
 Python script to mass grab images linked from a PluralKit export JSON file.
