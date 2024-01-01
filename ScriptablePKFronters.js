@@ -14,7 +14,9 @@
 //
 
 const userOptions = {
-  // Replace "exmpl" here with your system ID
+  // Replace "exmpl" here with your system ID.
+  // If you provide a token below, this field
+  // is ignored.
   system: "exmpl",
 
   // If your current fronters are private,
@@ -60,8 +62,24 @@ function timeAgo(elapsed) {
     }
   }
 
-  if (s === "") Math.floor(elapsed / 1000) + "s";
+  if (s === "") s = Math.floor(elapsed / 1000) + "s";
   return s;
+}
+
+function tinyStringHash(str) {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash &= hash;
+  }
+  return hash;
+}
+
+function determineFallbackAvatar(member) {
+  let avid = 0;
+  if (member.uuid !== undefined) avid = tinyStringHash(member.uuid);
+  return `https://cdn.discordapp.com/embed/avatars/${Math.abs(avid)%4}.png`;
 }
 
 function FronterWidget(opts) {
@@ -71,7 +89,7 @@ function FronterWidget(opts) {
     useDisplayNames: false,
     showAvatars: true,
     avatarSize: 24,
-    avatarPlaceholder: "https://cdn.discordapp.com/embed/avatars/0.png",
+    avatarPlaceholder: determineFallbackAvatar,
     listCutoffDefault: 5,
     listCutoffLarge: 9,
     backgroundColor: Color.dynamic(Color.white(), Color.black()),
@@ -80,28 +98,47 @@ function FronterWidget(opts) {
     apiBase: "https://api.pluralkit.me/v2",
   }, opts);
 
+  if (this.opts.token !== undefined) this.opts.system = '@me';
   this.avatarSize = new Size(this.opts.avatarSize, this.opts.avatarSize);
-  this.userAgent = "ScriptablePKFronters/0.1 (https://github.com/u1f408/pkmisc)";
+  this.userAgent = "ScriptablePKFronters/0.2 (https://github.com/u1f408/pkmisc)";
 
   return this;
 }
 
-FronterWidget.prototype.fetchFronters = function() {
-  let req = new Request(this.opts.apiBase + "/systems/" + this.opts.system + "/fronters");
-  req.headers = {"User-Agent": this.userAgent}
-  if (this.opts.token !== undefined)
-    req.headers["Authorization"] = this.opts.token;
-  return req.loadJSON();
+FronterWidget.prototype.fetchImage = function(url) {
+  let req = new Request(url);
+  req.headers = {"User-Agent": this.userAgent};
+  return req.loadImage();
 }
 
-FronterWidget.prototype.fetchMemberAvatar = function(member) {
-  let url = member.webhook_avatar_url
-    || member.avatar_url
-    || this.opts.avatarPlaceholder;
-
+FronterWidget.prototype.fetchFronters = async function() {
+  let url = this.opts.apiBase + "/systems/" + this.opts.system + "/fronters";
   let req = new Request(url);
-  req.headers = {"User-Agent": this.userAgent}
-  return req.loadImage();
+  req.headers = {"User-Agent": this.userAgent, "Authorization": this.opts.token};
+
+  let data = await req.loadJSON();
+  if (!("members" in data))
+    throw new Error(
+      "Couldn't get fronters!? " +
+      (this.opts.token === undefined
+        ? "Invalid system ID, or current fronters are private."
+        : "Your token might be invalid."));
+
+  return data;
+}
+
+FronterWidget.prototype.fetchMemberAvatar = async function(member) {
+  let url = member.webhook_avatar_url || member.avatar_url;
+
+  try {
+    if (!url) throw "noavi";
+    return await this.fetchImage(url);
+  } catch (ex) {
+    url = typeof this.opts.avatarPlaceholder == "function"
+      ? this.opts.avatarPlaceholder(member)
+      : this.opts.avatarPlaceholder;
+    return await this.fetchImage(url);
+  }
 }
 
 FronterWidget.prototype.renderMember = async function(member, list) {
@@ -120,7 +157,11 @@ FronterWidget.prototype.renderMember = async function(member, list) {
     mel.addSpacer(4);
   }
 
-  let mtxt = mel.addText(this.opts.useDisplayNames ? member.display_name || member.name : member.name || member.display_name);
+  let mname = this.opts.useDisplayNames
+    ? member.display_name || member.name
+    : member.name || member.display_name;
+
+  let mtxt = mel.addText(mname);
   mtxt.color = this.opts.textColorNormal;
 
   return mel;
