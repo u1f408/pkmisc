@@ -14,20 +14,13 @@
 //
 
 const userOptions = {
-  // Replace "exmpl" here with your system ID.
-  // If you provide a token below, this field
-  // is ignored.
-  system: "exmpl",
+  // Replace "exmpl" here with your system ID
+  system: "irises",
 
   // If your current fronters are private,
   // replace the word "undefined" below with
   // your PK token, surrounded by quotes.
   token: undefined,
-
-  // If you are using a large size widget,
-  // change this to true, otherwise set this
-  // to false.
-  isLargeWidget: false,
 
   // If you want to use display names, set to
   // true. Set to false to use base member names.
@@ -85,13 +78,13 @@ function determineFallbackAvatar(member) {
 function FronterWidget(opts) {
   this.opts = Object.assign({
     system: "exmpl",
-    isLargeWidget: false,
     useDisplayNames: false,
     showAvatars: true,
     avatarSize: 24,
     avatarPlaceholder: determineFallbackAvatar,
     listCutoffDefault: 5,
     listCutoffLarge: 9,
+    listCutoffAccessory: 3,
     backgroundColor: Color.dynamic(Color.white(), Color.black()),
     textColorNormal: Color.dynamic(Color.black(), Color.white()),
     textColorDimmed: Color.gray(),
@@ -100,7 +93,7 @@ function FronterWidget(opts) {
 
   if (this.opts.token !== undefined) this.opts.system = '@me';
   this.avatarSize = new Size(this.opts.avatarSize, this.opts.avatarSize);
-  this.userAgent = "ScriptablePKFronters/0.2 (https://github.com/u1f408/pkmisc)";
+  this.userAgent = "ScriptablePKFronters/0.3 (https://github.com/u1f408/pkmisc)";
 
   return this;
 }
@@ -127,42 +120,44 @@ FronterWidget.prototype.fetchFronters = async function() {
   return data;
 }
 
-FronterWidget.prototype.fetchMemberAvatar = async function(member) {
+FronterWidget.prototype.fetchMemberAvatar = async function(member, opts={}) {
+  opts = Object.assign({}, this.opts, opts);
   let url = member.webhook_avatar_url || member.avatar_url;
 
   try {
     if (!url) throw "noavi";
     return await this.fetchImage(url);
   } catch (ex) {
-    url = typeof this.opts.avatarPlaceholder == "function"
-      ? this.opts.avatarPlaceholder(member)
-      : this.opts.avatarPlaceholder;
+    url = typeof opts.avatarPlaceholder == "function"
+      ? opts.avatarPlaceholder(member)
+      : opts.avatarPlaceholder;
     return await this.fetchImage(url);
   }
 }
 
-FronterWidget.prototype.renderMember = async function(member, list) {
+FronterWidget.prototype.renderMember = async function(member, list, opts={}) {
+  opts = Object.assign({}, this.opts, opts);
   let mel = list.addStack();
   mel.layoutHorizontally();
   mel.centerAlignContent();
 
-  if (this.opts.showAvatars !== false) {
+  if (opts.showAvatars !== false) {
     let imgData = await this.fetchMemberAvatar(member);
     let img = mel.addImage(imgData);
     img.imageSize = this.avatarSize;
-    img.cornerRadius = this.opts.showAvatars === "circle"
+    img.cornerRadius = opts.showAvatars === "circle"
       ? Math.ceil(this.avatarSize.height / 2)
       : 3;
 
     mel.addSpacer(4);
   }
 
-  let mname = this.opts.useDisplayNames
-    ? member.display_name || member.name
-    : member.name || member.display_name;
+  let mname = opts.useDisplayNames
+    ? member.display_name ?? member.name
+    : member.name ?? member.display_name;
 
   let mtxt = mel.addText(mname);
-  mtxt.color = this.opts.textColorNormal;
+  mtxt.color = opts.textColorNormal;
 
   return mel;
 }
@@ -195,7 +190,7 @@ FronterWidget.prototype.renderWidget = async function() {
   let ts = timeAgo(Date.parse(res.timestamp) - now.getTime());
 
   let showMore = false;
-  let cutoff = this.opts.isLargeWidget
+  let cutoff = ["large", "extraLarge"].includes(config.widgetFamily)
     ? this.opts.listCutoffLarge
     : this.opts.listCutoffDefault;
 
@@ -205,7 +200,7 @@ FronterWidget.prototype.renderWidget = async function() {
   } else {
     cutoff = res.members.length;
   }
-
+  
   for (let n = 0; n < cutoff; n++) {
     await this.renderMember(res.members[n], list);
   }
@@ -228,9 +223,60 @@ FronterWidget.prototype.renderWidget = async function() {
   return base;
 }
 
+FronterWidget.prototype.renderAccessoryWidget = async function() {
+  let base = new ListWidget();
+  base.setPadding(4, 4, 4, 4);
+  //base.addAccessoryWidgetBackground = true;
+
+  var res;
+  try {
+    res = await this.fetchFronters();
+  } catch (ex) {
+    let etxt = base.addText(ex.message);
+    return base;
+  }
+
+  const now = new Date();
+  let ts = timeAgo(Date.parse(res.timestamp) - now.getTime());
+
+  let showMore = false;
+  let cutoff = this.opts.listCutoffAccessory;
+  if (cutoff < res.members.length) {
+    cutoff = cutoff - 1;
+    showMore = true;
+  } else {
+    cutoff = res.members.length;
+  }
+  
+  var memberText =
+    Array.from(res.members.slice(0, cutoff))
+    .map((m) => m.name ?? m.display_name)
+    .join(", ");
+
+  let mtxt = base.addText(memberText);
+  mtxt.font = Font.systemFont(16);
+
+  if (showMore) {
+    let stxt = base.addText("+" + (res.members.length - cutoff).toString() + " more");
+    stxt.font = Font.thinSystemFont(14);
+  }
+
+  base.addSpacer(null);
+  let mts = base.addText(ts.toString());
+  mts.font = Font.thinSystemFont(14);
+
+  return base;
+}
+
 let meow = new FronterWidget(userOptions);
-let widget = await meow.renderWidget();
-Script.setWidget(widget);
+if (config.widgetFamily === undefined) {
+  // (await meow.renderAccessoryWidget()).presentAccessoryRectangular();
+} else if (config.widgetFamily.startsWith("accessory")) {
+  Script.setWidget(await meow.renderAccessoryWidget());
+} else {
+  Script.setWidget(await meow.renderWidget());
+}
+
 Script.complete();
 
 // vim: set sts=0 ts=2 sw=2 et syntax=js :
