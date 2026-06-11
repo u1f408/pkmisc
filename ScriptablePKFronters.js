@@ -31,6 +31,19 @@ const userOptions = {
   // To show as a circle, set to "circle".
   // To disable member avatars, set to false.
   showAvatars: true,
+  
+  //
+  // Lock screen ("accessory") widgets
+  //
+
+  // To show each member name on its own line,
+  // set to true. Set to false to separate with
+  // commas.
+  accessoryMultiLine: false,
+  
+  // Maximum number of members to display on
+  // accessory widgets
+  listCutoffAccessory: 3,
 };
 
 //////////////////////////////////////////////
@@ -85,6 +98,9 @@ function FronterWidget(opts) {
     listCutoffDefault: 5,
     listCutoffLarge: 9,
     listCutoffAccessory: 3,
+    accessoryMultiLine: false,
+    accessoryFontNormal: Font.systemFont(14),
+    accessoryFontDimmed: Font.thinSystemFont(12),
     backgroundColor: Color.dynamic(Color.white(), Color.black()),
     textColorNormal: Color.dynamic(Color.black(), Color.white()),
     textColorDimmed: Color.gray(),
@@ -247,23 +263,33 @@ FronterWidget.prototype.renderAccessoryWidget = async function() {
   } else {
     cutoff = res.members.length;
   }
-  
-  var memberText =
-    Array.from(res.members.slice(0, cutoff))
-    .map((m) => m.name ?? m.display_name)
-    .join(", ");
 
-  let mtxt = base.addText(memberText);
-  mtxt.font = Font.systemFont(16);
+  if (this.opts.accessoryMultiLine) {
+    for (let n = 0; n < cutoff; n++) {
+      let m = res.members[n];
+      let mtxt = base.addText(m.name ?? m.display_name);
+      mtxt.font = this.opts.accessoryFontNormal;
+      mtxt.lineLimit = 0;
+    }
+  } else {
+    var memberText =
+      Array.from(res.members.slice(0, cutoff))
+      .map((m) => m.name ?? m.display_name)
+      .join(", ");
+  
+    let mtxt = base.addText(memberText);
+    mtxt.font = this.opts.accessoryFontNormal;
+    mtxt.lineLimit = 0;
+  }
 
   if (showMore) {
     let stxt = base.addText("+" + (res.members.length - cutoff).toString() + " more");
-    stxt.font = Font.thinSystemFont(14);
+    stxt.font = this.opts.accessoryFontDimmed;
   }
 
   base.addSpacer(null);
   let mts = base.addText(ts.toString());
-  mts.font = Font.thinSystemFont(14);
+  mts.font = this.opts.accessoryFontDimmed;
 
   return base;
 }
